@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ice Fishing Game - Player Zone</title>
+    <style>
+        body {
+            margin: 0;
+            background: linear-gradient(135deg, #001f3f, #001122);
+            font-family: Arial, sans-serif;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        h1 { color: #00e5ff; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px;}
+        
+        .wheel-container {
+            position: relative;
+            width: 320px;
+            height: 320px;
+        }
+        canvas {
+            border-radius: 50%;
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.4);
+            transition: transform 5s cubic-bezier(0.1, 0.8, 0.1, 1);
+        }
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid #ff1744;
+            z-index: 10;
+        }
+        #msg {
+            margin-top: 25px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #e0f7fa;
+            text-align: center;
+            min-height: 35px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Ice Fishing Game</h1>
+    
+    <div class="wheel-container">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="320" height="320"></canvas>
+    </div>
+
+    <div id="msg">Waiting for game host to start... 🎣</div>
+
+    <script>
+        const canvas = document.getElementById('wheel');
+        const ctx = canvas.getContext('2d');
+        const msgDiv = document.getElementById('msg');
+        
+        const totalBlocks = 40;
+        const colors = ["#3b82f6", "#f97316", "#ef4444"]; 
+        let currentRotation = 0;
+        let isSpinning = false;
+
+        function drawWheel() {
+            const arc = (2 * Math.PI) / totalBlocks;
+            const radius = canvas.width / 2;
+
+            for (let i = 0; i < totalBlocks; i++) {
+                const angle = i * arc;
+                ctx.beginPath();
+                ctx.moveTo(radius, radius);
+                ctx.arc(radius, radius, radius, angle, angle + arc);
+                ctx.lineTo(radius, radius);
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                ctx.stroke();
+
+                // Numbers
+                ctx.save();
+                ctx.translate(radius, radius);
+                ctx.rotate(angle + arc / 2);
+                ctx.textAlign = "right";
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 8px Arial";
+                ctx.fillText(i + 1, radius - 15, 3);
+                ctx.restore();
+            }
+        }
+
+        function runUserSpin(targetBlock) {
+            if (isSpinning) return;
+            isSpinning = true;
+            msgDiv.innerHTML = "The host dropped the fishing line! Spinning... ❄️";
+
+            const degreesPerBlock = 360 / totalBlocks;
+            // Align chosen block index directly with the top red pointing arrow
+            const targetCenterDeg = ((targetBlock - 1) * degreesPerBlock) + (degreesPerBlock / 2);
+            const stopAngleDeg = (360 - targetCenterDeg + 270) % 360;
+
+            const extraSpins = 7 * 360; // 7 fast clean rotations
+            currentRotation = extraSpins + stopAngleDeg;
+
+            canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+            setTimeout(() => {
+                msgDiv.innerHTML = `Landed on: <span style="color:#00e5ff; font-size:1.6rem;">Block ${targetBlock}</span>`;
+                isSpinning = false;
+
+                // Seamlessly reset positioning tracks behind the scenes
+                canvas.style.transition = 'none';
+                const normalAngle = currentRotation % 360;
+                canvas.style.transform = `rotate(${normalAngle}deg)`;
+                currentRotation = normalAngle;
+                setTimeout(() => {
+                    canvas.style.transition = 'transform 5s cubic-bezier(0.1, 0.8, 0.1, 1)';
+                }, 50);
+
+            }, 5000);
+        }
+
+        // --- THE LIVE CONNECTION BRIDGE ---
+        // This monitors storage updates instantly across panels
+        window.addEventListener('storage', (event) => {
+            if (event.key === 'admin_spin_command' && event.newValue) {
+                const command = JSON.parse(event.newValue);
+                // Trigger the animation using the block specified by the admin
+                runUserSpin(command.targetBlock);
+            }
+        });
+
+        drawWheel();
+    </script>
+</body>
+</html>
